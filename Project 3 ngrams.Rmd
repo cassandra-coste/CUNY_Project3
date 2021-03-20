@@ -1,0 +1,167 @@
+---
+title: "Project 3 ngrams"
+author: "Cassandra Coste"
+date: "3/19/2021"
+output: html_document
+---
+
+```{r load-packages, message=FALSE, warning=FALSE}
+
+library(readr)
+library(tidyverse)
+library(stringi)
+library(tm)
+library(corpus)
+library(wordcloud)
+library(data.table)
+
+```
+
+### Load data
+
+```{r}
+
+jobs_df <- as.data.frame(read.delim("https://raw.githubusercontent.com/cassandra-coste/CUNY607/main/project_3/raw_jobdata.csv", header = TRUE, stringsAsFactors = FALSE, sep = ","))
+
+text <- jobs_df %>% select(description)
+```
+
+### Make corpus and remove punctuation, numbers, stopwords, convert cases, etc
+
+```{r jobs}
+
+corpus <- VCorpus(VectorSource(text))
+corpus <- tm_map(corpus, removePunctuation)
+corpus <- tm_map(corpus, content_transformer(tolower))
+corpus <- tm_map(corpus, removeNumbers)
+corpus <- tm_map(corpus, removeWords, stopwords("english"))
+corpus <- tm_map(corpus, stripWhitespace)
+corpus <- tm_map(corpus, removeWords, c("gender","race","religion","sexual","orientation"))
+
+
+
+```
+
+```{r}
+
+wordcloud(corpus, max.words = 50, colors = colorRampPalette(brewer.pal(7, "Dark2"))(32))
+
+```
+
+### Tokenization of textbody into unigrams (one word), bigrams (two words), trigrams (three words), and quadgrams(four words)
+
+```{r}
+
+#Unigrams
+unigramTokenizer <- function(x) { unlist(lapply(ngrams(words(x), 1), paste, collapse = " "), use.names = FALSE) }
+unigram <- TermDocumentMatrix(corpus, control = list(wordLengths = c(1, 20)))
+
+
+#Bigrams
+bigramTokenizer <- function(x) { unlist(lapply(ngrams(words(x), 2), paste, collapse = " "), use.names = FALSE) }
+bigram <- TermDocumentMatrix(corpus, control = list(wordLengths = c(3, 40),tokenize = bigramTokenizer))
+
+
+#Trigrams
+trigramTokenizer <- function(x) { unlist(lapply(ngrams(words(x), 3), paste, collapse = " "), use.names = FALSE) }
+trigram <- TermDocumentMatrix(corpus, control = list(wordLengths = c(3, 60),tokenize = trigramTokenizer))
+
+
+```
+
+### Create unigrams, bigrams, and trigrams of interest
+
+```{r}
+
+#Unigrams
+
+my_unigrams <- c("python", "sql")
+
+#Bigrams 
+
+my_bigrams <- c("machine learning", "big data")
+
+#Trigrams
+
+my_trigrams <- c("natural language processing", "written verbal communication")
+
+
+```
+
+
+### Search for unigrams, bigrams, and trigrams
+
+```{r}
+
+unigrams_specified <- DocumentTermMatrix(corpus, control=list(tokenizer = unigramTokenizer, dictionary = my_unigrams))
+
+inspect(unigrams_specified)
+
+bigrams_specified <- DocumentTermMatrix(corpus, control=list(tokenizer = bigramTokenizer, dictionary = my_bigrams))
+
+inspect(bigrams_specified)
+
+trigrams_specified <- DocumentTermMatrix(corpus, control=list(tokenizer = trigramTokenizer, dictionary = my_trigrams))
+
+inspect(trigrams_specified)
+
+ngrams_df <- cbind(data.frame(unigrams_specified), data.frame(bigrams_specified), data.frame(trigrams_specified))
+
+
+```
+
+
+### Plot unigram
+
+
+
+```{r}
+
+unigramrow <- sort(slam::row_sums(unigram), decreasing=T)
+unigramfreq <- data.table(tok = names(unigramrow), freq = unigramrow)
+
+ggplot(unigramfreq[1:25,], aes(x = reorder(tok,freq), y = freq)) + coord_flip() +
+     geom_bar(stat = "identity", fill = "coral") + theme_bw() +
+     ggtitle("Top 25 Unigrams") +labs(x = "", y = "")
+
+unigramspecified_row <- sort(slam::row_sums(unigrams_specified), decreasing=T)
+unigramspecifiedfreq <- data.table(tok = names(unigramspecified_row), freq = unigramspecified_row)
+
+ggplot(unigramspecifiedfreq, aes(x = reorder(tok,freq), y = freq)) + coord_flip() +
+     geom_bar(stat = "identity", fill = "coral") + theme_bw() +
+     ggtitle("Top Targeted Unigrams") +labs(x = "", y = "")
+```
+
+
+### Plot bigram
+
+```{r}
+
+#Bigrams
+
+bigramrow <- sort(slam::row_sums(bigram), decreasing=T)
+bigramfreq <- data.table(tok = names(bigramrow), freq = bigramrow)
+
+ggplot(bigramfreq[1:25,], aes(x = reorder(tok,freq), y = freq)) + coord_flip() +
+     geom_bar(stat = "identity", fill = "coral") + theme_bw() +
+     ggtitle("Top 25 Bigrams") +labs(x = "", y = "")
+
+```
+
+
+### Plot trigram
+
+```{r}
+
+#Trigrams
+trigramrow <- sort(slam::row_sums(trigram), decreasing=T)
+trigramfreq <- data.table(tok = names(trigramrow), freq = trigramrow)
+
+ggplot(trigramfreq[1:25,], aes(x = reorder(tok,freq), y = freq)) + coord_flip() +
+     geom_bar(stat = "identity", fill = "coral") + theme_bw() +
+     ggtitle("Top 25 Trigrams") +labs(x = "", y = "")
+
+```
+
+
+
